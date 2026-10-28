@@ -1,0 +1,56 @@
+%%{init: {"fontFamily": "Arial, Helvetica, sans-serif", "flowchart": {"curve": "basis", "nodeSpacing": 40, "rankSpacing": 34, "wrappingWidth": 320, "padding": 10}, "themeVariables": {"fontFamily": "Arial, sans-serif", "fontSize": "15px"}}}%%
+flowchart TB
+
+    subgraph LEGEND["Legend"]
+        direction LR
+        L1["AI step"]:::ai
+        L2["Rule / plain code"]:::rule
+        L3["Human checkpoint"]:::human
+        L4["Audit log / storage"]:::store
+        L1 ~~~ L2 ~~~ L3 ~~~ L4
+    end
+
+    S0["0 · Admin sets criteria and weights<br/>Saved as a new criteria version<br/>(old versions kept)"]:::human
+    S1["1 · Reviewer uploads PDFs<br/>and picks the category"]:::human
+    S2["2 · Read text from each PDF<br/>(OCR if scanned)<br/>Save original file + text"]:::rule
+    S3["3 · AI pulls out facts for each criterion,<br/>each with an exact quote as evidence<br/>Reports any text trying to instruct the AI"]:::ai
+    S4["4 · Check the AI output<br/>Valid format? Does every quote really appear in the PDF text?<br/>If not: flag as possible made-up fact"]:::rule
+    FACTS[("Cached facts<br/>(per proposal)")]:::store
+    S5{{"5 · Mandatory gates (pass / fail)<br/>Licence held by bidder · WSIB · Insurance ≥ $5M · Price ≤ ceiling"}}:::rule
+    INEL["INELIGIBLE<br/>(with reason)"]:::rule
+    S6{{"6 · Flag checks<br/>Key info missing? · Injection attempt?<br/>Experience unverifiable? · Low confidence?"}}:::rule
+    FLAG["FLAGGED<br/>Provisional score shown, not ranked"]:::rule
+    S9["9 · Optional: AI drafts a<br/>clarification question<br/>(e.g. missing timeline)<br/>Reviewer edits before sending"]:::ai
+    S7["7 · Weighted scoring<br/>+ written reasons<br/>→ RANKED list"]:::rule
+    S8["8 · Close-call check<br/>Warn if a small weight change<br/>would swap ranks"]:::rule
+    S10["10 · Reviewer checks evidence,<br/>resolves flags, can override any<br/>score or status (written reason required)"]:::human
+    S11["11 · Final award decision<br/>made by a person"]:::human
+
+    CHG{{"Criteria changed?"}}:::rule
+    AUDIT[("AUDIT LOG — every step writes here<br/>Criteria, prompt and model versions<br/>AI output and evidence · Scores<br/>Overrides: who, when, why")]:::store
+
+    LEGEND ~~~ S0
+    S0 --> S1 --> S2 --> S3 --> S4
+    S4 --> FACTS
+    FACTS --> S5
+    S5 -- "Fail" --> INEL
+    S5 -- "Pass" --> S6
+    S6 -- "Yes" --> FLAG
+    S6 -- "No" --> S7
+    FLAG --> S9
+    S9 --> S10
+    S7 --> S8 --> S10
+    INEL --> S10
+    S10 -- "Flag resolved:<br/>back to scoring" --> S7
+    S10 --> S11
+
+    S0 -.-> CHG
+    CHG -. "Yes: re-run steps 5–8 from cached facts<br/>(no new AI call; old results kept<br/>under the old version)" .-> FACTS
+
+    S11 -.-> AUDIT
+
+    classDef ai fill:#DCEBFF,stroke:#1F5FBF,stroke-width:2px,color:#0B2A55
+    classDef rule fill:#DFF3E1,stroke:#2E8B3E,stroke-width:2px,color:#123D1A
+    classDef human fill:#FFE7CC,stroke:#D9730D,stroke-width:2px,color:#5A2E00
+    classDef store fill:#ECECEC,stroke:#6B6B6B,stroke-width:2px,color:#222222
+    style LEGEND fill:#FFFFFF,stroke:#999999,stroke-dasharray:4 3
