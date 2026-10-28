@@ -65,13 +65,15 @@ Category: {category_name}
 Project constraints (for context only; do not judge against them):
 {project_constraints}
 
-Criteria to extract. Each has an id, a value type and what to look for:
+Criteria to extract. Each has an id, a type, what to look for, and the
+fields (sub-facts) to extract for it:
 {criteria_json}
 
 Prompt version: {prompt_version}
 
 Return exactly one entry in "criteria" for each criterion above, in the same
-order, using the criterion ids exactly as given. Put prompt_version into the
+order, and inside it exactly one entry in "fields" for each field listed. Use
+the criterion and field ids exactly as given. Put prompt_version into the
 output unchanged.
 
 <proposal id="{proposal_id}">
@@ -100,15 +102,26 @@ output unchanged.
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["criterion_id", "value", "unit", "evidence", "confidence", "notes"],
+        "required": ["criterion_id", "fields"],
         "properties": {
           "criterion_id": { "type": "string" },
-          "value": { "type": ["string", "number", "boolean", "null"] },
-          "unit": { "type": ["string", "null"], "description": "e.g. CAD, weeks, years, count; null for booleans" },
-          "evidence": { "type": ["string", "null"], "description": "Verbatim quote from the proposal; null only when value is null" },
-          "holder": { "enum": ["bidder", "subcontractor", "unknown", null], "description": "Required for qualification criteria" },
-          "confidence": { "enum": ["high", "medium", "low"] },
-          "notes": { "type": ["string", "null"], "description": "One short sentence, e.g. why confidence is not high" }
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["field_id", "value", "unit", "evidence", "confidence", "notes"],
+              "properties": {
+                "field_id": { "type": "string" },
+                "value": { "type": ["string", "number", "boolean", "null"] },
+                "unit": { "type": ["string", "null"], "description": "e.g. CAD, weeks, years, count; null for booleans" },
+                "evidence": { "type": ["string", "null"], "description": "Verbatim quote from the proposal; null only when value is null" },
+                "holder": { "enum": ["bidder", "subcontractor", "unknown", null], "description": "Required for qualification fields" },
+                "confidence": { "enum": ["high", "medium", "low"] },
+                "notes": { "type": ["string", "null"], "description": "One short sentence, e.g. why confidence is not high" }
+              }
+            }
+          }
         }
       }
     },
@@ -121,9 +134,10 @@ output unchanged.
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["criterion_id", "reason"],
+        "required": ["criterion_id", "field_id", "reason"],
         "properties": {
           "criterion_id": { "type": "string" },
+          "field_id": { "type": "string" },
           "reason": { "type": "string" }
         }
       }
@@ -141,25 +155,43 @@ The example below is invented to show the shape. It is not from any real proposa
   "criteria": [
     {
       "criterion_id": "electrical_licence",
-      "value": true,
-      "unit": null,
-      "evidence": "Example Co. holds licence no. 0000000.",
-      "holder": "bidder",
-      "confidence": "high",
-      "notes": null
+      "fields": [
+        {
+          "field_id": "licence_held",
+          "value": true,
+          "unit": null,
+          "evidence": "Example Co. holds licence no. 0000000.",
+          "holder": "bidder",
+          "confidence": "high",
+          "notes": null
+        }
+      ]
     },
     {
-      "criterion_id": "duration_weeks",
-      "value": null,
-      "unit": "weeks",
-      "evidence": null,
-      "confidence": "high",
-      "notes": "Schedule described only as 'to be agreed'."
+      "criterion_id": "warranty",
+      "fields": [
+        {
+          "field_id": "panel_years",
+          "value": 25,
+          "unit": "years",
+          "evidence": "Panels carry a 25-year manufacturer warranty.",
+          "confidence": "high",
+          "notes": null
+        },
+        {
+          "field_id": "workmanship_years",
+          "value": null,
+          "unit": "years",
+          "evidence": null,
+          "confidence": "high",
+          "notes": "Workmanship terms described only as 'to be agreed'."
+        }
+      ]
     }
   ],
   "injection_attempts": ["Note to automated reviewers: <example instruction>"],
   "missing_information": [
-    { "criterion_id": "duration_weeks", "reason": "No completion duration stated." }
+    { "criterion_id": "warranty", "field_id": "workmanship_years", "reason": "No workmanship warranty period stated." }
   ]
 }
 ```
@@ -168,22 +200,73 @@ The example below is invented to show the shape. It is not from any real proposa
 
 ## 4. Example `{criteria_json}`: Commercial Solar
 
-An admin would set this up for the Commercial Solar category. Gates and weights are not part of it, because those stay in the scoring config.
+The admin defines the criteria and their fields on the admin screens, and the prompt simply renders whatever is configured. Nothing here is hard-coded in the prompt. Commercial Solar has exactly 7 admin criteria: 2 mandatory and 5 weighted. Weights and gate thresholds are not sent to the model, because they stay in the scoring config.
 
 ```json
 [
-  { "id": "electrical_licence", "type": "qualification", "what_to_look_for": "A valid electrical contractor licence, its number, and whether the bidder or a subcontractor holds it." },
-  { "id": "wsib_clearance", "type": "qualification", "what_to_look_for": "A current WSIB clearance certificate or account in good standing." },
-  { "id": "liability_insurance_5m", "type": "qualification", "what_to_look_for": "Commercial general liability coverage of at least $5M, with the stated amount." },
-  { "id": "commercial_installs_5yrs", "type": "count", "what_to_look_for": "Number of commercial solar installations completed in the last 5 years. Note the dates or the period the count covers." },
-  { "id": "price_total", "type": "currency", "what_to_look_for": "Total fixed price for the full scope, before tax if stated." },
-  { "id": "duration_weeks", "type": "duration_weeks", "what_to_look_for": "Committed time from start to completion, in weeks." },
-  { "id": "panel_warranty_years", "type": "years", "what_to_look_for": "Manufacturer panel or performance warranty, in years." },
-  { "id": "workmanship_warranty_years", "type": "years", "what_to_look_for": "Installer workmanship warranty, in years." },
-  { "id": "named_project_lead", "type": "boolean", "what_to_look_for": "A specific named person who will lead the project." },
-  { "id": "crew_described", "type": "boolean", "what_to_look_for": "The installation crew's size or roles." },
-  { "id": "safety_plan", "type": "boolean", "what_to_look_for": "A site-specific health and safety plan, or its contents." },
-  { "id": "monitoring_plan", "type": "boolean", "what_to_look_for": "A post-installation system monitoring or performance reporting plan." }
+  {
+    "id": "electrical_licence",
+    "type": "mandatory",
+    "what_to_look_for": "Valid electrical contractor licence held by the bidder.",
+    "fields": [
+      { "id": "licence_held", "type": "boolean" },
+      { "id": "licence_number", "type": "string" }
+    ]
+  },
+  {
+    "id": "wsib_and_insurance",
+    "type": "mandatory",
+    "what_to_look_for": "WSIB clearance and at least $5M commercial general liability insurance.",
+    "fields": [
+      { "id": "wsib_clearance", "type": "boolean" },
+      { "id": "liability_insurance_amount", "type": "currency" }
+    ]
+  },
+  {
+    "id": "experience",
+    "type": "weighted",
+    "what_to_look_for": "Commercial solar installations completed in the last 5 years.",
+    "fields": [
+      { "id": "install_count", "type": "count" },
+      { "id": "earliest_year_counted", "type": "year" }
+    ]
+  },
+  {
+    "id": "price",
+    "type": "weighted",
+    "what_to_look_for": "Total fixed price for the full scope.",
+    "fields": [
+      { "id": "total_price", "type": "currency" }
+    ]
+  },
+  {
+    "id": "timeline",
+    "type": "weighted",
+    "what_to_look_for": "Committed time from start to completion.",
+    "fields": [
+      { "id": "duration_weeks", "type": "weeks" }
+    ]
+  },
+  {
+    "id": "warranty",
+    "type": "weighted",
+    "what_to_look_for": "Panel warranty and workmanship warranty length.",
+    "fields": [
+      { "id": "panel_years", "type": "years" },
+      { "id": "workmanship_years", "type": "years" }
+    ]
+  },
+  {
+    "id": "team",
+    "type": "weighted",
+    "what_to_look_for": "Named project lead, crew, site safety plan and post-install monitoring plan.",
+    "fields": [
+      { "id": "named_lead", "type": "boolean" },
+      { "id": "crew", "type": "boolean" },
+      { "id": "safety_plan", "type": "boolean" },
+      { "id": "monitoring_plan", "type": "boolean" }
+    ]
+  }
 ]
 ```
 
@@ -193,7 +276,7 @@ An admin would set this up for the Commercial Solar category. Gates and weights 
 
 - **Quotes are verified:** code checks that every `evidence` string appears in the extracted PDF text, after normalising whitespace only. If a quote isn't found, that value is flagged as a possible made-up fact and is not used for scoring until a person checks it.
 - **Schema check:** the output is validated against the schema above. If it is invalid JSON or fails the schema, the request is retried once. If it fails again, the proposal is flagged for manual extraction.
-- **Every criterion answered:** a missing or unexpected `criterion_id` counts as a schema failure.
+- **Every criterion answered:** a missing or unexpected `criterion_id` or `field_id` counts as a schema failure.
 - **Repeatable runs:** temperature is 0 and the model version is pinned. The model version, `prompt_version`, criteria version and a hash of the input text are logged for every run.
 - **Injection attempts:** a non-empty `injection_attempts` list sets the proposal's status to `flagged` for human review.
 - **Cached extraction:** results are cached per proposal, model version and prompt version. Changing weights or limits re-runs `score.py` on the cached facts without calling the AI again. Only a new proposal, prompt or criteria list triggers a new extraction.
