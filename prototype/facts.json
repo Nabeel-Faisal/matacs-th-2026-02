@@ -23,7 +23,8 @@
     "panel_warranty": 25,
     "workmanship_warranty": 5,
     "team": {"named_lead": false, "crew": false, "safety_plan": false, "monitoring_plan": false},
-    "injection_detected": false
+    "injection_detected": false,
+    "licence_holder": "subcontractor_tbc"
   },
   "C": {
     "licence": true,
@@ -36,7 +37,9 @@
     "panel_warranty": 25,
     "workmanship_warranty": 10,
     "team": {"named_lead": true, "crew": true, "safety_plan": false, "monitoring_plan": false},
-    "injection_detected": true
+    "injection_detected": true,
+    "installs_counted_since": 2020,
+    "injection_goal": "rank_first"
   },
   "D": {
     "licence": true,

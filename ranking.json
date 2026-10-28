@@ -4,34 +4,34 @@
     "rank": 1,
     "status": "ranked",
     "score": 92.7,
-    "reason": "Passes all gates; scored 92.7."
+    "reason": "Top scorer: most installs (14), fastest timeline (12 wks) and full team checklist; outweighs E's longer workmanship warranty (12 vs 10 yrs)."
   },
   {
     "proposal": "E",
     "rank": 2,
     "status": "ranked",
     "score": 73.5,
-    "reason": "Passes all gates; scored 73.5."
+    "reason": "Second: best warranty (25-yr panel, 12-yr workmanship) and full team checklist, but fewer installs (8 vs 14) and higher price ($242,500 vs $238,000) than A."
   },
   {
     "proposal": "D",
     "rank": null,
     "status": "flagged",
     "score": null,
-    "reason": "Needs review: no timeline given. Provisional score 69.8 (timeline scored 0)."
+    "reason": "Flagged: no completion timeline given, so the 16-week limit can't be checked; ask contractor before ranking. Provisional 69.8."
   },
   {
     "proposal": "C",
     "rank": null,
     "status": "flagged",
     "score": null,
-    "reason": "Needs review: prompt injection detected; installs within 5 yrs unverified. Provisional score 61.8."
+    "reason": "Flagged: contains text instructing automated reviewers to rank it first, plus experience counted since 2020 may fall outside the 5-year window; human review needed. Provisional 61.8."
   },
   {
     "proposal": "B",
     "rank": null,
     "status": "ineligible",
     "score": null,
-    "reason": "Ineligible: missing licence."
+    "reason": "Ineligible: licence is not held by the bidder (only an unnamed subcontractor to be confirmed after award)."
   }
 ]

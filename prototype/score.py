@@ -14,6 +14,22 @@ RANKING_PATH = HERE.parent / "ranking.json"
 
 MANDATORY = ("licence", "wsib", "insurance_5m")
 CRITERIA = ("experience", "price", "timeline", "warranty", "team")
+MAX_REASON = 200
+ORDINALS = ("Top scorer", "Second", "Third", "Fourth", "Fifth")
+
+# Wording for coded fields in facts.json (our own words, not proposal text).
+MISSING_TEXT = {
+    "licence": "bidder holds no valid licence",
+    "wsib": "no WSIB clearance",
+    "insurance_5m": "no $5M liability insurance",
+}
+LICENCE_HOLDER_TEXT = {
+    "subcontractor_tbc": "licence is not held by the bidder (only an unnamed "
+                         "subcontractor to be confirmed after award)",
+}
+INJECTION_GOAL_TEXT = {
+    "rank_first": "rank it first",
+}
 
 
 def load(path):
@@ -26,27 +42,54 @@ def ratio(num, den):
     return 1.0 if den == 0 else num / den
 
 
+def join_words(items):
+    if len(items) <= 1:
+        return "".join(items)
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def team_count(f):
+    return sum(bool(v) for v in f["team"].values())
+
+
 def check_eligibility(f, crit):
     """Return a list of reasons the proposal is ineligible (empty if eligible)."""
-    problems = [f"missing {key}" for key in MANDATORY if not f[key]]
+    problems = []
+    for key in MANDATORY:
+        if f[key]:
+            continue
+        if key == "licence" and f.get("licence_holder") in LICENCE_HOLDER_TEXT:
+            problems.append(LICENCE_HOLDER_TEXT[f["licence_holder"]])
+        else:
+            problems.append(MISSING_TEXT[key])
     if problems:
         return problems
     if f["price"] > crit["budget_ceiling"]:
-        problems.append(f"price ${f['price']:,} over ${crit['budget_ceiling']:,} ceiling")
+        problems.append(f"price ${f['price']:,} is over the ${crit['budget_ceiling']:,} ceiling")
     if f["weeks"] is not None and f["weeks"] > crit["max_weeks"]:
-        problems.append(f"{f['weeks']} weeks over {crit['max_weeks']}-week max")
+        problems.append(f"{f['weeks']} weeks is over the {crit['max_weeks']}-week limit")
     return problems
 
 
-def check_flags(f):
+def check_flags(f, crit):
+    """Return (flag clauses, needs_human_review) for a proposal."""
     flags = []
+    human = False
     if f["injection_detected"]:
-        flags.append("prompt injection detected")
+        goal = INJECTION_GOAL_TEXT.get(f.get("injection_goal"), "change the outcome")
+        flags.append(f"contains text instructing automated reviewers to {goal}")
+        human = True
     if f["weeks"] is None:
-        flags.append("no timeline given")
+        flags.append(f"no completion timeline given, so the {crit['max_weeks']}-week "
+                     "limit can't be checked")
     if not f["installs_within_5yrs_verified"]:
-        flags.append("installs within 5 yrs unverified")
-    return flags
+        since = f.get("installs_counted_since")
+        if since:
+            flags.append(f"experience counted since {since} may fall outside the 5-year window")
+        else:
+            flags.append("installs within the 5-year window are unverified")
+        human = True
+    return flags, human
 
 
 def score_all(eligible, crit):
@@ -71,7 +114,7 @@ def score_all(eligible, crit):
             "timeline": timeline,
             "warranty": 0.5 * ratio(f["panel_warranty"], max_panel)
             + 0.5 * ratio(f["workmanship_warranty"], max_work),
-            "team": sum(bool(v) for v in f["team"].values()) / 4,
+            "team": team_count(f) / 4,
         }
     return parts
 
@@ -80,6 +123,114 @@ def total(part, weights):
     # A criterion that can't be scored (None) contributes 0.
     return round(sum((part[c] or 0) * weights[c] for c in CRITERIA), 1)
 
+
+# --- Reason wording -------------------------------------------------------
+
+def strength_text(c, f):
+    """Phrase for a criterion where this proposal is best among eligible ones."""
+    if c == "experience":
+        return f"most installs ({f['installs']})"
+    if c == "price":
+        return f"lowest price (${f['price']:,})"
+    if c == "timeline":
+        return f"fastest timeline ({f['weeks']} wks)"
+    if c == "warranty":
+        return f"best warranty ({f['panel_warranty']}-yr panel, {f['workmanship_warranty']}-yr workmanship)"
+    n = team_count(f)
+    return "full team checklist" if n == 4 else f"best team checklist ({n}/4)"
+
+
+def compare_text(c, better, worse, from_better):
+    """Phrase for where `better` beats `worse` on criterion c.
+
+    from_better=True  -> "longer workmanship warranty (12 vs 10 yrs)"
+    from_better=False -> "fewer installs (8 vs 14)"
+    """
+    if c == "experience":
+        words, key, pre, unit = ("more installs", "fewer installs"), "installs", "", ""
+    elif c == "price":
+        words, key, pre, unit = ("lower price", "higher price"), "price", "$", ""
+    elif c == "timeline":
+        words, key, pre, unit = ("shorter timeline", "longer timeline"), "weeks", "", " wks"
+    elif c == "warranty":
+        kind = "workmanship" if better["workmanship_warranty"] != worse["workmanship_warranty"] else "panel"
+        words = (f"longer {kind} warranty", f"shorter {kind} warranty")
+        key, pre, unit = f"{kind}_warranty", "", " yrs"
+    else:
+        a, b = team_count(better), team_count(worse)
+        words = ("fuller team checklist", "thinner team checklist")
+        return f"{words[0]} ({a}/4 vs {b}/4)" if from_better else f"{words[1]} ({b}/4 vs {a}/4)"
+
+    def fmt(v):
+        return f"{pre}{v:,}"
+
+    a, b = better[key], worse[key]
+    if from_better:
+        return f"{words[0]} ({fmt(a)} vs {fmt(b)}{unit})"
+    return f"{words[1]} ({fmt(b)} vs {fmt(a)}{unit})"
+
+
+def edges(parts, weights, pid, other):
+    """Criteria where `other` beats `pid`, largest weighted gap first."""
+    gaps = []
+    for c in CRITERIA:
+        mine, theirs = parts[pid][c], parts[other][c]
+        if mine is None or theirs is None:
+            continue
+        gap = (theirs - mine) * weights[c]
+        if gap > 1e-9:
+            gaps.append((gap, c))
+    return [c for _, c in sorted(gaps, key=lambda g: -g[0])]
+
+
+def strengths(parts, weights, facts, pid):
+    """Criteria where pid is best among eligible proposals; else its top contributors."""
+    tops = []
+    for c in CRITERIA:
+        mine = parts[pid][c]
+        best = max((p[c] for p in parts.values() if p[c] is not None), default=None)
+        if mine is not None and best is not None and mine >= best - 1e-9:
+            tops.append(strength_text(c, facts[pid]))
+    if tops:
+        return tops
+    by_points = sorted(CRITERIA, key=lambda c: -((parts[pid][c] or 0) * weights[c]))
+    return [f"strongest on {c}" for c in by_points[:2]]
+
+
+def ranked_reason(order, i, parts, weights, facts):
+    pid = order[i]
+    head = ORDINALS[i] if i < len(ORDINALS) else f"Rank {i + 1}"
+    good = join_words(strengths(parts, weights, facts, pid))
+
+    if i == 0:
+        if len(order) == 1:
+            return f"{head}: {good}."
+        nxt = order[1]
+        theirs = edges(parts, weights, pid, nxt)[:2]
+        if not theirs:
+            return f"{head}: {good}; ahead of {nxt} on every criterion."
+        why = join_words([compare_text(c, facts[nxt], facts[pid], True) for c in theirs])
+        return f"{head}: {good}; outweighs {nxt}'s {why}."
+
+    above = order[i - 1]
+    weak = edges(parts, weights, pid, above)[:2]
+    if not weak:
+        return f"{head}: {good}; level with {above} on every criterion but scores lower overall."
+    why = join_words([compare_text(c, facts[above], facts[pid], False) for c in weak])
+    return f"{head}: {good}, but {why} than {above}."
+
+
+def flagged_reason(f, crit, provisional):
+    flags, human = check_flags(f, crit)
+    action = "human review needed" if human else "ask contractor before ranking"
+    return f"Flagged: {', plus '.join(flags)}; {action}. Provisional {provisional}."
+
+
+def ineligible_reason(problems):
+    return f"Ineligible: {'; '.join(problems)}."
+
+
+# --- Main ------------------------------------------------------------------
 
 def main():
     facts = load(FACTS_PATH)
@@ -96,34 +247,28 @@ def main():
     parts = score_all(eligible, crit) if eligible else {}
     scores = {pid: total(p, weights) for pid, p in parts.items()}
 
-    ranked, flagged, rejected = [], [], []
-    for pid in sorted(facts):
-        if pid in ineligible:
-            rejected.append({
-                "proposal": pid, "rank": None, "status": "ineligible", "score": None,
-                "reason": "Ineligible: " + "; ".join(ineligible[pid]) + ".",
-            })
-            continue
-        flags = check_flags(facts[pid])
-        if flags:
-            note = " (timeline scored 0)" if parts[pid]["timeline"] is None else ""
-            flagged.append({
-                "proposal": pid, "rank": None, "status": "flagged", "score": None,
-                "reason": "Needs review: " + "; ".join(flags)
-                + f". Provisional score {scores[pid]}{note}.",
-            })
-        else:
-            ranked.append({
-                "proposal": pid, "rank": None, "status": "ranked", "score": scores[pid],
-                "reason": f"Passes all gates; scored {scores[pid]}.",
-            })
+    ranked_ids = [pid for pid in eligible if not check_flags(facts[pid], crit)[0]]
+    flagged_ids = [pid for pid in eligible if pid not in ranked_ids]
+    ranked_ids.sort(key=lambda pid: (-scores[pid], pid))
+    flagged_ids.sort(key=lambda pid: (-scores[pid], pid))
 
-    ranked.sort(key=lambda r: (-r["score"], r["proposal"]))
-    for i, r in enumerate(ranked, start=1):
-        r["rank"] = i
-    flagged.sort(key=lambda r: (-scores[r["proposal"]], r["proposal"]))
+    results = []
+    for i, pid in enumerate(ranked_ids):
+        results.append({
+            "proposal": pid, "rank": i + 1, "status": "ranked", "score": scores[pid],
+            "reason": ranked_reason(ranked_ids, i, parts, weights, facts),
+        })
+    for pid in flagged_ids:
+        results.append({
+            "proposal": pid, "rank": None, "status": "flagged", "score": None,
+            "reason": flagged_reason(facts[pid], crit, scores[pid]),
+        })
+    for pid in sorted(ineligible):
+        results.append({
+            "proposal": pid, "rank": None, "status": "ineligible", "score": None,
+            "reason": ineligible_reason(ineligible[pid]),
+        })
 
-    results = ranked + flagged + rejected
     with open(RANKING_PATH, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
         f.write("\n")
@@ -151,9 +296,8 @@ def main():
     print("* provisional score, not ranked; n/a = not scorable (counts as 0)")
     print()
     for r in results:
-        rank = r["rank"] if r["rank"] is not None else "-"
-        print(f"{r['proposal']}  rank {rank:<2} {r['status']:<11} {r['reason']}")
-    print()
+        if len(r["reason"]) > MAX_REASON:
+            print(f"WARNING: reason for {r['proposal']} is {len(r['reason'])} chars (> {MAX_REASON})")
     print(f"Wrote {RANKING_PATH}")
 
 

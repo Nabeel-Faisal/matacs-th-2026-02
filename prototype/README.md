@@ -20,3 +20,7 @@ It reads `facts.json` (extracted facts per proposal) and `criteria.json` (weight
 Scores are normalized across every proposal that isn't ineligible, so flagged ones count. A criterion that can't be scored, such as a missing timeline, counts as 0.
 
 To change weights or limits, edit `criteria.json` and bump `version`.
+
+## Reasons
+
+Each reason line is built from the data, so it stays correct when facts or weights change. Ranked proposals list the criteria they lead on and compare against their neighbour in the ranking. Flagged and ineligible ones state the specific issue. Optional coded fields in `facts.json` (`licence_holder`, `installs_counted_since`, `injection_goal`) add detail; their wording lives in `score.py`, not copied from proposals.
