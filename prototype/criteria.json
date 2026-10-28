@@ -1,0 +1,12 @@
+{
+  "version": "v1",
+  "budget_ceiling": 260000,
+  "max_weeks": 16,
+  "weights": {
+    "experience": 30,
+    "price": 25,
+    "timeline": 15,
+    "warranty": 15,
+    "team": 15
+  }
+}

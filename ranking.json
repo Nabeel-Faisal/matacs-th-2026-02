@@ -1,1 +1,37 @@
-[]
+[
+  {
+    "proposal": "A",
+    "rank": 1,
+    "status": "ranked",
+    "score": 92.7,
+    "reason": "Passes all gates; scored 92.7."
+  },
+  {
+    "proposal": "E",
+    "rank": 2,
+    "status": "ranked",
+    "score": 73.5,
+    "reason": "Passes all gates; scored 73.5."
+  },
+  {
+    "proposal": "D",
+    "rank": null,
+    "status": "flagged",
+    "score": null,
+    "reason": "Needs review: no timeline given. Provisional score 69.8 (timeline scored 0)."
+  },
+  {
+    "proposal": "C",
+    "rank": null,
+    "status": "flagged",
+    "score": null,
+    "reason": "Needs review: prompt injection detected; installs within 5 yrs unverified. Provisional score 61.8."
+  },
+  {
+    "proposal": "B",
+    "rank": null,
+    "status": "ineligible",
+    "score": null,
+    "reason": "Ineligible: missing licence."
+  }
+]

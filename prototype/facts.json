@@ -1,0 +1,67 @@
+{
+  "A": {
+    "licence": true,
+    "wsib": true,
+    "insurance_5m": true,
+    "installs": 14,
+    "installs_within_5yrs_verified": true,
+    "price": 238000,
+    "weeks": 12,
+    "panel_warranty": 25,
+    "workmanship_warranty": 10,
+    "team": {"named_lead": true, "crew": true, "safety_plan": true, "monitoring_plan": true},
+    "injection_detected": false
+  },
+  "B": {
+    "licence": false,
+    "wsib": true,
+    "insurance_5m": true,
+    "installs": 6,
+    "installs_within_5yrs_verified": true,
+    "price": 189500,
+    "weeks": 10,
+    "panel_warranty": 25,
+    "workmanship_warranty": 5,
+    "team": {"named_lead": false, "crew": false, "safety_plan": false, "monitoring_plan": false},
+    "injection_detected": false
+  },
+  "C": {
+    "licence": true,
+    "wsib": true,
+    "insurance_5m": true,
+    "installs": 9,
+    "installs_within_5yrs_verified": false,
+    "price": 244000,
+    "weeks": 14,
+    "panel_warranty": 25,
+    "workmanship_warranty": 10,
+    "team": {"named_lead": true, "crew": true, "safety_plan": false, "monitoring_plan": false},
+    "injection_detected": true
+  },
+  "D": {
+    "licence": true,
+    "wsib": true,
+    "insurance_5m": true,
+    "installs": 11,
+    "installs_within_5yrs_verified": true,
+    "price": 231000,
+    "weeks": null,
+    "panel_warranty": 25,
+    "workmanship_warranty": 10,
+    "team": {"named_lead": true, "crew": false, "safety_plan": true, "monitoring_plan": false},
+    "injection_detected": false
+  },
+  "E": {
+    "licence": true,
+    "wsib": true,
+    "insurance_5m": true,
+    "installs": 8,
+    "installs_within_5yrs_verified": true,
+    "price": 242500,
+    "weeks": 13,
+    "panel_warranty": 25,
+    "workmanship_warranty": 12,
+    "team": {"named_lead": true, "crew": true, "safety_plan": true, "monitoring_plan": true},
+    "injection_detected": false
+  }
+}
